@@ -59,9 +59,10 @@ class WatchdogService : Service() {
         val isOwner = dpm.isDeviceOwnerApp(packageName)
         Log.i(Constants.TAG, "isDeviceOwnerApp=$isOwner")
         if (isOwner && !lockTaskApplied) {
-            dpm.setLockTaskPackages(admin, arrayOf(packageName, Constants.FRAME_PACKAGE))
+            val allowlist = arrayOf(packageName, Constants.FRAME_PACKAGE, Constants.SETTINGS_PACKAGE)
+            dpm.setLockTaskPackages(admin, allowlist)
             lockTaskApplied = true
-            Log.i(Constants.TAG, "Lock task allowlist set: $packageName, ${Constants.FRAME_PACKAGE}")
+            Log.i(Constants.TAG, "Lock task allowlist set: ${allowlist.joinToString()}")
         }
     }
 
