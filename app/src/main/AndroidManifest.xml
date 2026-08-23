@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.REORDER_TASKS" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:label="CareCast Device Manager"
@@ -48,6 +49,18 @@
         <service
             android:name=".WatchdogService"
             android:exported="false" />
+
+        <receiver
+            android:name=".InstallResultReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".EmergencyReleaseReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="app.carecast.devicemanager.EMERGENCY_RELEASE" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>

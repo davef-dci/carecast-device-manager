@@ -1,11 +1,9 @@
 package app.carecast.devicemanager
 
-import android.app.ActivityOptions
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -18,33 +16,49 @@ import androidx.core.app.NotificationCompat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
+/**
+ * No lock task / kiosk enforcement here, deliberately. Earlier revisions locked Frame
+ * into lock task mode for theft/repurposing protection, but that's not a real threat in
+ * this deployment context (monitored senior-living rooms) — and it caused a real bench
+ * lockout (lock task blocked uninstall, Settings access, even wireless debugging itself,
+ * with no software escape short of clearing Device Owner status entirely). Device Owner
+ * status is kept (needed for silent PackageInstaller updates), but nothing here ever
+ * restricts navigation: Home, Settings, everything stays normally reachable, always.
+ */
 class WatchdogService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
-    private lateinit var dpm: DevicePolicyManager
-    private lateinit var admin: ComponentName
-    private var lockTaskApplied = false
+    private val updateExecutor = Executors.newSingleThreadExecutor()
+    private lateinit var releaseChecker: ReleaseChecker
 
     private val relaunchRunnable = object : Runnable {
         override fun run() {
-            relaunchFrame()
+            relaunchFrameIfNotRunning()
             recordCheck()
             handler.postDelayed(this, Constants.RELAUNCH_INTERVAL_MS)
         }
     }
 
+    private val updateCheckRunnable = object : Runnable {
+        override fun run() {
+            updateExecutor.submit { releaseChecker.checkAndInstall() }
+            handler.postDelayed(this, Constants.UPDATE_CHECK_INTERVAL_MS)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
-        dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        admin = ComponentName(this, DeviceManagerAdminReceiver::class.java)
+        releaseChecker = ReleaseChecker(this)
         startForeground(NOTIFICATION_ID, buildNotification())
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        applyLockTaskAllowlist()
         handler.removeCallbacks(relaunchRunnable)
         handler.post(relaunchRunnable)
+        handler.removeCallbacks(updateCheckRunnable)
+        handler.postDelayed(updateCheckRunnable, Constants.UPDATE_CHECK_INTERVAL_MS)
         return START_STICKY
     }
 
@@ -52,48 +66,28 @@ class WatchdogService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(relaunchRunnable)
+        handler.removeCallbacks(updateCheckRunnable)
         super.onDestroy()
     }
 
-    private fun applyLockTaskAllowlist() {
-        val isOwner = dpm.isDeviceOwnerApp(packageName)
-        Log.i(Constants.TAG, "isDeviceOwnerApp=$isOwner")
-        if (isOwner && !lockTaskApplied) {
-            val allowlist = arrayOf(packageName, Constants.FRAME_PACKAGE, Constants.SETTINGS_PACKAGE)
-            dpm.setLockTaskPackages(admin, allowlist)
-            lockTaskApplied = true
-            Log.i(Constants.TAG, "Lock task allowlist set: ${allowlist.joinToString()}")
-        }
-    }
-
-    private fun relaunchFrame() {
-        // FLAG_ACTIVITY_REORDER_TO_FRONT reuses Frame's existing task if it's still
-        // running, and ActivityOptions.setLockTaskEnabled only takes effect on a
-        // genuinely fresh task launch — reordering an existing task to front silently
-        // does NOT (re-)engage lock task. So: only do the cheap reorder-to-front when
-        // we're already locked; otherwise force a fresh task (CLEAR_TASK) so lock task
-        // actually (re-)activates, whether Frame crashed or simply was never locked yet.
-        val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-        val alreadyLocked = am.lockTaskModeState == android.app.ActivityManager.LOCK_TASK_MODE_LOCKED
-
+    private fun relaunchFrameIfNotRunning() {
+        // Deliberately NOT trying to detect "is Frame's process actually alive" —
+        // ActivityManager.getRunningAppProcesses() is restricted to the caller's own
+        // process for most apps, and empirically (tested live 2026-08-22) that
+        // restriction is NOT waived for this Device Owner app on this OS build either:
+        // a version of this method that checked process state via that API still
+        // relaunched Frame over Settings, because the check silently always came back
+        // "not running." Rather than keep guessing at an unreliable, permission-gated
+        // API, this just relaunches unconditionally on a long interval. Plain
+        // reorder-to-front (harmless no-op if Frame's already there), infrequent enough
+        // that real field-service work in Settings has time to finish uninterrupted.
         val intent = Intent().apply {
             component = ComponentName(Constants.FRAME_PACKAGE, Constants.FRAME_MAIN_ACTIVITY)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (alreadyLocked) {
-                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-            } else {
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            }
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
         }
         try {
-            if (!alreadyLocked && Build.VERSION.SDK_INT >= 28 && dpm.isDeviceOwnerApp(packageName)) {
-                val options = ActivityOptions.makeBasic()
-                options.setLockTaskEnabled(true)
-                startActivity(intent, options.toBundle())
-            } else {
-                startActivity(intent)
-            }
-            Log.i(Constants.TAG, "Frame relaunch issued (alreadyLocked=$alreadyLocked)")
+            startActivity(intent)
+            Log.i(Constants.TAG, "Frame relaunch issued")
         } catch (e: Exception) {
             Log.e(Constants.TAG, "Failed to relaunch Frame", e)
         }

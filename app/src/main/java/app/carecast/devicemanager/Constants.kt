@@ -3,12 +3,14 @@ package app.carecast.devicemanager
 object Constants {
     const val FRAME_PACKAGE = "app.carecast.frame"
     const val FRAME_MAIN_ACTIVITY = "com.example.hotlaps.frameapp.MainActivity"
-    // Frame's own hidden field-service gesture (long-press the version badge) launches
-    // system Settings directly. Without this in the lock-task allowlist, that launch is
-    // silently blocked by Android itself (ActivityManager error code 101) regardless of
-    // Frame's code — confirmed 2026-08-22 on real hardware. Keep allowlisted so field
-    // techs retain Wi-Fi/diagnostics access without needing a separate escape mechanism.
-    const val SETTINGS_PACKAGE = "com.android.settings"
     const val TAG = "DeviceManager"
-    const val RELAUNCH_INTERVAL_MS = 20_000L
+    // Relaunches unconditionally (see WatchdogService), so this is a direct trade-off
+    // between crash-recovery speed and how long a legitimate Settings/field-service
+    // session gets before a possible interruption. 5 minutes errs toward not disrupting
+    // real work; revisit once there's a reliable way to detect Frame's actual state.
+    const val RELAUNCH_INTERVAL_MS = 300_000L
+    // Test-only cadence for live verification. Production should be much less
+    // frequent (~hourly + random jitter, per the architecture assessment) once this
+    // moves off the sandbox manifest and onto a real per-environment config.
+    const val UPDATE_CHECK_INTERVAL_MS = 45_000L
 }
