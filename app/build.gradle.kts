@@ -15,6 +15,24 @@ android {
         versionName = "0.1"
     }
 
+    flavorDimensions += "target"
+    productFlavors {
+        create("prod") {
+            dimension = "target"
+            buildConfigField("String", "FIRESTORE_PROJECT_ID", "\"carecast-v2\"")
+        }
+        create("sandbox") {
+            dimension = "target"
+            applicationIdSuffix = ".sandbox"
+            versionNameSuffix = "-sandbox"
+            buildConfigField("String", "FIRESTORE_PROJECT_ID", "\"carecast-sandbox\"")
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

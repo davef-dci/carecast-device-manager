@@ -9,8 +9,9 @@ object Constants {
     // session gets before a possible interruption. 5 minutes errs toward not disrupting
     // real work; revisit once there's a reliable way to detect Frame's actual state.
     const val RELAUNCH_INTERVAL_MS = 300_000L
-    // Test-only cadence for live verification. Production should be much less
-    // frequent (~hourly + random jitter, per the architecture assessment) once this
-    // moves off the sandbox manifest and onto a real per-environment config.
-    const val UPDATE_CHECK_INTERVAL_MS = 45_000L
+    // Hourly, plus random jitter applied in WatchdogService (see
+    // UPDATE_CHECK_JITTER_MS) — avoids every device in the fleet hammering the manifest
+    // at the exact same moment. 45s was tonight's live-testing cadence, not a real one.
+    const val UPDATE_CHECK_INTERVAL_MS = 3_600_000L
+    const val UPDATE_CHECK_JITTER_MS = 300_000L
 }

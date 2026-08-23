@@ -13,14 +13,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 
-/**
- * TEST-ONLY configuration. Points at the carecast-sandbox Firebase project for live
- * end-to-end OTA testing, not the production carecast-v2 manifest Frame itself reads
- * for content. Phase 3 (admin publish UI + real manifest ownership in care-cast-api)
- * will replace this hardcoded URL with a proper per-flavor/per-environment config.
- */
-private const val MANIFEST_URL =
-    "https://firestore.googleapis.com/v1/projects/carecast-sandbox/databases/(default)/documents/frameReleases/latest"
+// Which Firebase project's manifest to poll is a build-flavor decision (prod ->
+// carecast-v2, sandbox -> carecast-sandbox), same split frameapp already uses — not a
+// hardcoded constant, so a sandbox-flavor build can never accidentally end up pointed
+// at production or vice versa.
+private val MANIFEST_URL =
+    "https://firestore.googleapis.com/v1/projects/${BuildConfig.FIRESTORE_PROJECT_ID}/databases/(default)/documents/frameReleases/latest"
 
 class ReleaseChecker(private val context: Context) {
 

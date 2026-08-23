@@ -44,7 +44,8 @@ class WatchdogService : Service() {
     private val updateCheckRunnable = object : Runnable {
         override fun run() {
             updateExecutor.submit { releaseChecker.checkAndInstall() }
-            handler.postDelayed(this, Constants.UPDATE_CHECK_INTERVAL_MS)
+            val jitter = (0 until Constants.UPDATE_CHECK_JITTER_MS).random()
+            handler.postDelayed(this, Constants.UPDATE_CHECK_INTERVAL_MS + jitter)
         }
     }
 
