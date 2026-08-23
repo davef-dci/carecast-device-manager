@@ -165,6 +165,18 @@ upload it to Storage — those two steps stay manual regardless of which path yo
    $downloadUrl = "https://firebasestorage.googleapis.com/v0/b/carecast-v2.firebasestorage.app/o/frameReleases%2Fcarecast-frame-<version>.apk?alt=media&token=$token"
    $downloadUrl   # copy this into the UI form
    ```
+   The APK now genuinely exists in Cloud Storage as a file — not Firestore, which only
+   ever holds the small metadata document pointing *at* this file. You can see it in the
+   Firebase console (Storage → the project → `frameReleases/` folder) or confirm via
+   `gcloud storage objects describe <path>`.
+
+   **If you lose `$token`** (new terminal, came back to this later) — don't regenerate
+   it, that would silently change the URL registered on any release already published
+   with the old one. Look it up instead:
+   ```powershell
+   $token = (gcloud storage objects describe "gs://carecast-v2.firebasestorage.app/frameReleases/carecast-frame-<version>.apk" --format="value(custom_fields.firebaseStorageDownloadTokens)")
+   ```
+   or open the file in the Firebase console's Storage browser — the access token / download link is right there in the file details panel.
 3. In the webapp, **Admin → Frame Releases**: fill in version code/name, paste the
    download URL, and select the same local APK file in the file picker — the browser
    hashes it locally (Web Crypto, nothing uploaded) and fills in the SHA-256 for you.
