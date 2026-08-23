@@ -18,6 +18,24 @@ class InstallResultReceiver : BroadcastReceiver() {
                 .edit()
                 .putString("last_update_result", "success")
                 .apply()
+
+            // A fresh install (no prior version to replace) never fires
+            // MY_PACKAGE_REPLACED for Frame, so nothing else launches it — confirmed
+            // live 2026-08-22, Frame sat on the Android launcher after a successful
+            // silent install until manually started. An in-place update DOES fire that
+            // broadcast (Frame's own boot receiver picks it up), so this is technically
+            // redundant in that case, but harmless — relaunching an already-foreground
+            // Frame is just a no-op reorder-to-front.
+            val launch = Intent().apply {
+                component = android.content.ComponentName(Constants.FRAME_PACKAGE, Constants.FRAME_MAIN_ACTIVITY)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            }
+            try {
+                context.startActivity(launch)
+                Log.i(Constants.TAG, "Frame launched after successful install")
+            } catch (e: Exception) {
+                Log.e(Constants.TAG, "Failed to launch Frame after install", e)
+            }
         } else {
             context.getSharedPreferences("watchdog", Context.MODE_PRIVATE)
                 .edit()

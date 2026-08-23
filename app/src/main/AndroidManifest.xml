@@ -7,6 +7,15 @@
     <uses-permission android:name="android.permission.REORDER_TASKS" />
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Android 11+ package-visibility restriction: without this, PackageManager
+         .getPackageInfo(FRAME_PACKAGE, ...) silently fails as if Frame weren't
+         installed at all (AppsFilter blocks the query), regardless of Device Owner
+         status. Confirmed live 2026-08-22: ReleaseChecker's installed-version check
+         always read 0, so every update cycle re-triggered an unnecessary reinstall. -->
+    <queries>
+        <package android:name="app.carecast.frame" />
+    </queries>
+
     <application
         android:label="CareCast Device Manager"
         android:allowBackup="false"
