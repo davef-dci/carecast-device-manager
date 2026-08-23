@@ -141,9 +141,49 @@ only matters if the old device is still somehow powered on and running.
 - **`adb devices` may show the same tablet twice** if both USB and wireless debugging
   are active — target the right one explicitly with `-s <serial>`.
 
-## Reference: publishing a new release (until the admin UI exists)
+## Publishing a new release (Admin UI)
 
-There's no publish UI yet — releases are published by hand. From `frameapp` on `main`:
+`care-cast-webapp` has a **Frame Releases** admin tab (Admin → Frame Releases) as of
+2026-08-23. This is now the normal way to publish — it handles history, targeting
+specific devices instead of the whole fleet, and halting, none of which the manual
+fallback below does on its own. What it does **not** do is build/sign the APK or
+upload it to Storage — those two steps stay manual regardless of which path you use.
+
+1. **Build and sign**, same as always:
+   ```powershell
+   # bump versionCode/versionName in frameapp/app/build.gradle.kts first
+   .\gradlew.bat :app:assembleProdRelease
+   ```
+2. **Upload the APK to Storage** with a fresh download token (still a script step — the
+   UI intentionally doesn't handle file upload, to avoid needing browser-based Storage
+   upload infrastructure at this scale):
+   ```powershell
+   $apk = "app\build\outputs\apk\prod\release\app-prod-release.apk"
+   $token = [guid]::NewGuid().ToString()
+   gcloud storage cp $apk "gs://carecast-v2.firebasestorage.app/frameReleases/carecast-frame-<version>.apk"
+   gcloud storage objects update "gs://carecast-v2.firebasestorage.app/frameReleases/carecast-frame-<version>.apk" --custom-metadata=firebaseStorageDownloadTokens=$token
+   $downloadUrl = "https://firebasestorage.googleapis.com/v0/b/carecast-v2.firebasestorage.app/o/frameReleases%2Fcarecast-frame-<version>.apk?alt=media&token=$token"
+   $downloadUrl   # copy this into the UI form
+   ```
+3. In the webapp, **Admin → Frame Releases**: fill in version code/name, paste the
+   download URL, and select the same local APK file in the file picker — the browser
+   hashes it locally (Web Crypto, nothing uploaded) and fills in the SHA-256 for you.
+   Signing cert SHA-256 is pre-filled with the current production key's value; only
+   change it if the key itself has been rotated. Optionally list specific device IDs to
+   target a canary rollout instead of the whole fleet. **Save as candidate** — this
+   registers it but does not make it live.
+4. Review the candidate in the release history table, then click **Publish** when
+   ready. This is the point it actually becomes what Device Manager will detect and
+   install.
+5. If something's wrong after publishing, click **Halt** on the live release banner —
+   stops new devices from picking it up. Devices that already installed it need a
+   forward-fix release (higher versionCode), not a downgrade — same rule as always.
+
+## Manual fallback (direct Firestore/Storage access)
+
+Useful if the webapp/API isn't reachable, or for scripting/automation later. Same
+underlying data the UI writes to, just via `gcloud`/`curl` directly. From `frameapp` on
+`main`:
 
 ```powershell
 # 1. Bump versionCode/versionName in app/build.gradle.kts, then build:
@@ -158,7 +198,9 @@ $token = [guid]::NewGuid().ToString()
 gcloud storage cp $apk "gs://carecast-v2.firebasestorage.app/frameReleases/carecast-frame-<version>.apk"
 gcloud storage objects update "gs://carecast-v2.firebasestorage.app/frameReleases/carecast-frame-<version>.apk" --custom-metadata=firebaseStorageDownloadTokens=$token
 
-# 4. Publish the manifest (adjust versionCode/versionName/sha256/downloadUrl):
+# 4. Publish the manifest directly (adjust versionCode/versionName/sha256/downloadUrl)
+#    — this bypasses the release-history collection the UI maintains, writing straight
+#    to the live pointer doc Device Manager polls:
 $accessToken = gcloud auth print-access-token
 $downloadUrl = "https://firebasestorage.googleapis.com/v0/b/carecast-v2.firebasestorage.app/o/frameReleases%2Fcarecast-frame-<version>.apk?alt=media&token=$token"
 $body = @{
