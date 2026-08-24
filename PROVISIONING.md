@@ -167,7 +167,7 @@ upload it to Storage — those two steps stay manual regardless of which path yo
    UI intentionally doesn't handle file upload, to avoid needing browser-based Storage
    upload infrastructure at this scale):
    ```powershell
-   $apk = "app\build\outputs\apk\prod\release\app-prod-release.apk"
+   $apk = "D:\software_projects\frameapp\app\build\outputs\apk\prod\release\app-prod-release.apk"
    $token = [guid]::NewGuid().ToString()
    gcloud storage cp $apk "gs://carecast-v2.firebasestorage.app/frameReleases/carecast-frame-<version>.apk"
    gcloud storage objects update "gs://carecast-v2.firebasestorage.app/frameReleases/carecast-frame-<version>.apk" --custom-metadata=firebaseStorageDownloadTokens=$token
@@ -211,7 +211,7 @@ underlying data the UI writes to, just via `gcloud`/`curl` directly. From `frame
 .\gradlew.bat :app:assembleProdRelease
 
 # 2. Checksum the output:
-$apk = "app\build\outputs\apk\prod\release\app-prod-release.apk"
+$apk = "D:\software_projects\frameapp\app\build\outputs\apk\prod\release\app-prod-release.apk"
 $hash = (Get-FileHash $apk -Algorithm SHA256).Hash.ToLower()
 
 # 3. Upload to production Storage with a fresh download token:
