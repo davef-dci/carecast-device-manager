@@ -16,14 +16,21 @@ three real incidents that shaped this process.
   can become completely unrecoverable (a real incident: it refused to stay enabled at
   all while a bad policy was active, with no way back in except USB). USB debugging is
   a separate toggle that wasn't affected by the same failure.
-- Signed release APKs for both apps, built from the `prod` flavor:
-  - `app-prod-release.apk` for **CareCast Frame** (from `frameapp`, `main` branch)
-  - `app-prod-release.apk` for **CareCast Device Manager** (from `carecast-device-manager`, `main`)
-  - Verify signatures before installing anything (see `frameapp/keystore.properties` for
-    local signing; production cert SHA-256 should be
-    `41:A6:03:60:F4:10:07:29:0A:44:5A:39:24:31:F1:4A:65:6F:62:C6:A9:D3:0A:53:8B:EE:05:A7:9B:ED:35:A6`)
-- `adb` on PATH, `gcloud`/`firebase` CLI authenticated if you'll be publishing a release
-  as part of this session too.
+- Both APKs, built from the `prod` flavor:
+  - **CareCast Frame**: a real signed release —
+    `frameapp\app\build\outputs\apk\prod\release\app-prod-release.apk` (`.\gradlew.bat :app:assembleProdRelease`
+    from the `frameapp` repo root). Verify signature before installing anything;
+    production cert SHA-256 should be
+    `41:A6:03:60:F4:10:07:29:0A:44:5A:39:24:31:F1:4A:65:6F:62:C6:A9:D3:0A:53:8B:EE:05:A7:9B:ED:35:A6`.
+  - **CareCast Device Manager**: **no signing config exists for this app yet** (unlike
+    Frame) — only a debug build is available:
+    `carecast-device-manager\app\build\outputs\apk\prod\debug\app-prod-debug.apk`
+    (`.\gradlew.bat assembleProdDebug`). This is fine for now — Device Manager doesn't
+    remotely self-update in v1, so its own signing consistency doesn't matter the way
+    Frame's does. Revisit if that ever changes.
+- `adb` on PATH (`adb version` should just work from any terminal — see the CareCast
+  repo topology memory if it doesn't), `gcloud`/`firebase` CLI authenticated if you'll be
+  publishing a release as part of this session too.
 
 ## Step 1 — Basic device setup
 
@@ -59,8 +66,10 @@ adb shell pm list packages | Select-String "com.google.android.gms|com.android.v
 
 ## Step 3 — Install and provision Device Manager
 
+Full paths throughout, so it doesn't matter which directory your terminal is in:
+
 ```powershell
-adb install app-prod-release.apk    # the Device Manager APK
+adb install "D:\software_projects\carecast-device-manager\app\build\outputs\apk\prod\debug\app-prod-debug.apk"
 adb shell dpm set-device-owner app.carecast.devicemanager/.DeviceManagerAdminReceiver
 ```
 Should print `Success: Device owner set to ...`. Confirm:
@@ -74,7 +83,7 @@ Device Owner — no further action needed to activate it.
 ## Step 4 — Install CareCast Frame
 
 ```powershell
-adb install app-prod-release.apk    # the Frame APK
+adb install "D:\software_projects\frameapp\app\build\outputs\apk\prod\release\app-prod-release.apk"
 ```
 Device Manager's watchdog will launch it automatically within a few minutes, or force
 it immediately:
